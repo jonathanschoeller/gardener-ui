@@ -1,33 +1,10 @@
 angular.module('GardenerApp', ['chart.js'])
-    .config(['$locationProvider', function ($locationProvider) {
-        $locationProvider.html5Mode({
-            enabled: true,
-            requireBase: false
-        });
-        $locationProvider.hashPrefix('');
-    }])
     .controller('GardenerController', function ($scope, $window) {
 
-        var auth = initCognitoSDK(),
-            isAuthenticated = false,
-            apiUrl = 'https://ox8jzumrwe.execute-api.us-east-1.amazonaws.com/test/topics/',
-            topicRoot = 'BALCONY';
+        var topicRoot = awsConfig.topicRoot;
 
-        initAWSSDK();
-
+        AWS.config.update(awsConfig.global);
         $scope.ms = Number(localStorage.getItem('ms') || 2000);
-
-        $scope.isAuthenticated = function () {
-            return isAuthenticated;
-        };
-
-        $scope.signIn = function () {
-            auth.getSession();
-        };
-
-        $scope.signOut = function () {
-            auth.signOut();
-        };
 
         $scope.openValve = function (valveId, ms) {
             sendOpenValveCommand($scope.idToken, encodeURIComponent(topicRoot), valveId, ms);
@@ -38,7 +15,7 @@ angular.module('GardenerApp', ['chart.js'])
 
                     $.ajax({
                         type: 'POST',
-                        url: apiUrl + device,
+                        url: awsConfig.apiUrl + device,
                         data: JSON.stringify(data),
                         dataType: 'json',
                         contentType: 'application/json',
@@ -72,43 +49,6 @@ angular.module('GardenerApp', ['chart.js'])
             localStorage.setItem('ms', newValue);
         });
 
-        var curUrl = window.location.href;
-        auth.parseCognitoWebResponse(curUrl);
-
-        // Initialize a cognito auth object.
-        function initCognitoSDK() {
-            var pageUrl = window.location.href.split('#')[0].replace(/\/$/, ''),
-                authData = {
-                    ClientId: '45898j2266aq64nv9lqb0lc29e',
-                    AppWebDomain: 'schoeller.auth.us-east-1.amazoncognito.com',
-                    TokenScopesArray: ['email', 'openid', 'profile'],
-                    RedirectUriSignIn: pageUrl,
-                    RedirectUriSignOut: pageUrl
-                };
-
-            var _auth = new AWSCognito.CognitoIdentityServiceProvider.CognitoAuth(authData);
-            _auth.userhandler = {
-                onSuccess: function (result) {
-                    $scope.idToken = result.getIdToken().getJwtToken();
-                    isAuthenticated = true;
-                },
-                onFailure: function (err) {
-                    alert('Error!' + err);
-                }
-            };
-
-            return _auth;
-        }
-
-        function initAWSSDK() {
-            // Initialize the Amazon Cognito credentials provider
-            AWS.config.region = 'us-east-1'; // Region
-            // TODO: Probably need to replace this...
-            AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-                IdentityPoolId: 'us-east-1:4473d615-0228-42cf-b995-d644ad866c18',
-            });
-        }
-
         $scope.chartOptions = {
             'scales': {
                 'yAxes': [{
@@ -134,6 +74,18 @@ angular.module('GardenerApp', ['chart.js'])
                 }]
             }
         };
+
+        function getThingShadow(thingName, idToken) { 
+            var params = {
+                thingName: 'esp8266-gardener'
+            };
+
+            var iotdata = new AWS.IotData(awsConfig.iotDataOptions);
+            iotdata.getThingShadow(params, function(err, data){
+                if (err) console.log(err, err.stack);
+                else     console.log(data);
+            });
+        }
 
         function getData(topic, resultCallback, errorCallback) {
             var days = 2;
@@ -223,6 +175,8 @@ angular.module('GardenerApp', ['chart.js'])
 
                     $scope.$apply();
                 });
+            }, function(err, stack){
+                console.error(err);
             });
         }
 
