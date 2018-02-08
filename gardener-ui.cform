@@ -1,0 +1,240 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Gardener APIs",
+    "Metadata": {
+
+    },
+    "Parameters": {
+        "IotThingName":{
+            "Type": "String",
+            "Description": "Name of the existing Gardener IoT thing",
+            "Default": "esp8266-gardener"
+        },
+        "IotSubdomain":{
+            "Type": "String",
+            "Default": "a14bdnvwk8zpaa"
+        }
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+        "GardenerApi": {
+            "Type": "AWS::ApiGateway::RestApi",
+            "Properties": {
+                "Name": "Gardener API",
+                "Description": "API used to work with remote Gardener"
+            }
+        },
+
+        "GardenerApiStage": {
+            "DependsOn": "ApiGatewayAccount",
+            "Type": "AWS::ApiGateway::Stage",
+            "Properties": {
+                "DeploymentId": {"Ref": "ApiDeployment"},
+                "MethodSettings": [{
+                    "DataTraceEnabled": true,
+                    "HttpMethod": "*",
+                    "LoggingLevel": "INFO",
+                    "ResourcePath": "/*"
+                }],
+                "RestApiId": {"Ref": "GardenerApi"},
+                "StageName": "PROD"
+            }
+        },
+
+        "ApiGatewayCloudWatchLogsRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": { "Service": ["apigateway.amazonaws.com"] },
+                        "Action": ["sts:AssumeRole"]
+                    }]
+                },
+                "Policies": [{
+                    "PolicyName": "ApiGatewayLogsPolicy",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:DescribeLogGroups",
+                                "logs:DescribeLogStreams",
+                                "logs:PutLogEvents",
+                                "logs:GetLogEvents",
+                                "logs:FilterLogEvents"
+                            ],
+                            "Resource": "*"
+                        }]
+                    }
+                }]
+            }
+        },
+
+        "GardenerApiRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": { "Service": ["apigateway.amazonaws.com"] },
+                        "Action": ["sts:AssumeRole"]
+                    }]
+                },
+                "Policies": [{
+                    "PolicyName": "GardenerAPIPolicy",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action":[
+                                "iot:GetThingShadow",
+                                "iot:UpdateThingShadow"
+                            ],
+                            "Resource": {
+                                "Fn::Join": ["/", [
+                                    { "Fn::Join": [":", ["arn:aws:iot", {"Ref": "AWS::Region"}, {"Ref": "AWS::AccountId"}, "thing"]] },
+                                    { "Ref": "IotThingName" }
+                                ]]
+                            }
+                        }]
+                    }
+                }]
+            }
+        },
+
+        "ApiGatewayAccount": {
+            "Type": "AWS::ApiGateway::Account",
+            "Properties": {
+                "CloudWatchRoleArn": { "Fn::GetAtt": ["ApiGatewayCloudWatchLogsRole", "Arn"] }
+            }
+        },
+
+        "ApiDeployment": {
+            "Type": "AWS::ApiGateway::Deployment",
+            "DependsOn": ["GetThingRequest", "UpdateThingRequest"],
+            "Properties": {
+                "RestApiId": {"Ref": "GardenerApi"},
+                "StageName": "DummyStage"
+            }
+        },
+
+        "GardenerResource": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": {"Ref": "GardenerApi"},
+                "ParentId": {"Fn::GetAtt": ["GardenerApi", "RootResourceId"]},
+                "PathPart": "gardener"
+            }
+        },
+
+        "GetThingRequest": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "AuthorizationType": "NONE",
+                "ApiKeyRequired": true,
+                "HttpMethod": "GET",
+                "Integration": {
+                    "Type": "AWS",
+                    "IntegrationHttpMethod": "GET",
+                    "Uri": {
+                        "Fn::Join": [":", 
+                            [
+                                "arn:aws:apigateway", 
+                                {"Ref": "AWS::Region"}, 
+                                {"Fn::Join": [".", [{"Ref": "IotSubdomain"}, "iotdata"]]},
+                                {"Fn::Join": ["/", ["path/things", {"Ref": "IotThingName"}, "shadow"]]}
+                            ]
+                        ]
+                    },
+                    "IntegrationResponses": [{
+                        "StatusCode": 200
+                    }],
+                    "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
+                },
+                "ResourceId": {"Ref": "GardenerResource"},
+                "RestApiId": {"Ref": "GardenerApi"},
+                "MethodResponses": [{
+                    "StatusCode": 200
+                }]
+            }
+        },
+
+        "UpdateThingRequest": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "AuthorizationType": "NONE",
+                "ApiKeyRequired": true,
+                "HttpMethod": "POST",
+                "Integration": {
+                    "Type": "AWS",
+                    "IntegrationHttpMethod": "POST",
+                    "Uri": {
+                        "Fn::Join": [":", 
+                            [
+                                "arn:aws:apigateway", 
+                                {"Ref": "AWS::Region"}, 
+                                {"Fn::Join": [".", [{"Ref": "IotSubdomain"}, "iotdata"]]},
+                                {"Fn::Join": ["/", ["path/things", {"Ref": "IotThingName"}, "shadow"]]}
+                            ]
+                        ]
+                    },
+                    "IntegrationResponses": [{
+                        "StatusCode": 200
+                    }],
+                    "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
+                },
+                "ResourceId": {"Ref": "GardenerResource"},
+                "RestApiId": {"Ref": "GardenerApi"},
+                "MethodResponses": [{
+                    "StatusCode": 200
+                }]
+            }
+        },
+
+        "ApiKey": {
+            "Type": "AWS::ApiGateway::ApiKey",
+            "Properties": {
+                "Description": "API Key for the Gardener API",
+                "Name": "Gardener API",
+                "Enabled": true,
+                "StageKeys": [
+                    {
+                        "RestApiId": {"Ref": "GardenerApi"},
+                        "StageName": {"Ref": "GardenerApiStage"}
+                    }
+                ]
+            }
+        },
+
+        "UsagePlan": {
+            "Type": "AWS::ApiGateway::UsagePlan",
+            "Properties": {
+                "ApiStages": [
+                    { "ApiId": { "Ref": "GardenerApi" }, "Stage": { "Ref": "GardenerApiStage"} }
+                ]
+            }
+        },
+
+        "UsagePlanKey": {
+            "Type": "AWS::ApiGateway::UsagePlanKey",
+            "Properties": {
+                "KeyId": {"Ref": "ApiKey"},
+                "KeyType": "API_KEY",
+                "UsagePlanId": {"Ref": "UsagePlan"}
+            }
+        }
+    },
+    "Outputs": {
+
+    }
+}
