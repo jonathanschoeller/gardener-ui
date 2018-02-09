@@ -14,9 +14,11 @@ angular.module('GardenerApp', ['ngResource'])
         auth.userhandler = {
             onSuccess: function(result){
                 console.log(result);
+                return result;
             },
             onFailure: function(err){
                 console.error(err);
+                return err;
             }
         };
 
@@ -36,6 +38,7 @@ angular.module('GardenerApp', ['ngResource'])
         }
 
         this.getIdToken = function() {
+            var session = auth.isUserSignedIn() ? auth.getSession() : null;
             return auth.getSignInUserSession().getIdToken().getJwtToken();
         }
     })

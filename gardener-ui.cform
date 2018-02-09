@@ -126,7 +126,7 @@
 
         "ApiDeployment": {
             "Type": "AWS::ApiGateway::Deployment",
-            "DependsOn": ["GetThingRequest", "UpdateThingRequest"],
+            "DependsOn": ["GetThingRequest", "UpdateThingRequest", "OptionsRequest"],
             "Properties": {
                 "RestApiId": {"Ref": "GardenerApi"},
                 "StageName": "DummyStage"
@@ -162,14 +162,20 @@
                         ]
                     },
                     "IntegrationResponses": [{
-                        "StatusCode": 200
+                        "StatusCode": 200,
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
                     }],
                     "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
                 },
                 "ResourceId": {"Ref": "GardenerResource"},
                 "RestApiId": {"Ref": "GardenerApi"},
                 "MethodResponses": [{
-                    "StatusCode": 200
+                    "StatusCode": 200,
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": false
+                    }
                 }]
             }
         },
@@ -194,14 +200,61 @@
                         ]
                     },
                     "IntegrationResponses": [{
-                        "StatusCode": 200
+                        "StatusCode": 200,
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
                     }],
                     "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
                 },
                 "ResourceId": {"Ref": "GardenerResource"},
                 "RestApiId": {"Ref": "GardenerApi"},
                 "MethodResponses": [{
-                    "StatusCode": 200
+                    "StatusCode": 200,
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": false
+                    }
+                }]
+            }
+        },
+
+        "OptionsRequest": {
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "AuthorizationType": "NONE",
+                "RestApiId": {"Ref": "GardenerApi"},
+                "ResourceId": {"Ref": "GardenerResource"},
+                "HttpMethod": "OPTIONS",
+                "Integration": {
+                    "IntegrationResponses": [
+                        {
+                            "StatusCode": 200,
+                            "ResponseParameters": {
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-cognito-auth'",
+                                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'",
+                                "method.response.header.Access-Control-Allow-Origin": "'*'"
+                            },
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            }
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH",
+                    "RequestTemplates": {
+                        "application/json": "{'statusCode': 200}"
+                    },
+                    "Type": "MOCK"
+                },
+                "MethodResponses": [{
+                    "StatusCode": 200,
+                    "ResponseModels": {
+                        "application/json": "Empty"
+                    },
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Headers": false,
+                        "method.response.header.Access-Control-Allow-Methods": false,
+                        "method.response.header.Access-Control-Allow-Origin": false
+                    }
                 }]
             }
         },
