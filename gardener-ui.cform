@@ -13,6 +13,11 @@
         "IotSubdomain":{
             "Type": "String",
             "Default": "a14bdnvwk8zpaa"
+        },
+        "CognitoUserPool": {
+            "Type": "String",
+            "Description": "The ARN for your Cognito user pool",
+            "Default": "arn:aws:cognito-idp:us-east-1:440391788341:userpool/us-east-1_XhnjRllOF"
         }
     },
     "Mappings": {
@@ -121,7 +126,7 @@
 
         "ApiDeployment": {
             "Type": "AWS::ApiGateway::Deployment",
-            "DependsOn": ["GetThingRequest", "UpdateThingRequest"],
+            "DependsOn": ["GetThingRequest", "UpdateThingRequest", "OptionsRequest"],
             "Properties": {
                 "RestApiId": {"Ref": "GardenerApi"},
                 "StageName": "DummyStage"
@@ -140,8 +145,8 @@
         "GetThingRequest": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
-                "AuthorizationType": "NONE",
-                "ApiKeyRequired": true,
+                "AuthorizationType": "COGNITO_USER_POOLS",
+                "AuthorizerId": {"Ref": "GardenerAuthorizer"},
                 "HttpMethod": "GET",
                 "Integration": {
                     "Type": "AWS",
@@ -157,14 +162,20 @@
                         ]
                     },
                     "IntegrationResponses": [{
-                        "StatusCode": 200
+                        "StatusCode": 200,
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
                     }],
                     "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
                 },
                 "ResourceId": {"Ref": "GardenerResource"},
                 "RestApiId": {"Ref": "GardenerApi"},
                 "MethodResponses": [{
-                    "StatusCode": 200
+                    "StatusCode": 200,
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": false
+                    }
                 }]
             }
         },
@@ -172,8 +183,8 @@
         "UpdateThingRequest": {
             "Type": "AWS::ApiGateway::Method",
             "Properties": {
-                "AuthorizationType": "NONE",
-                "ApiKeyRequired": true,
+                "AuthorizationType": "COGNITO_USER_POOLS",
+                "AuthorizerId": {"Ref": "GardenerAuthorizer"},
                 "HttpMethod": "POST",
                 "Integration": {
                     "Type": "AWS",
@@ -189,52 +200,95 @@
                         ]
                     },
                     "IntegrationResponses": [{
-                        "StatusCode": 200
+                        "StatusCode": 200,
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": "'*'"
+                        }
                     }],
                     "Credentials": { "Fn::GetAtt": ["GardenerApiRole", "Arn"] }
                 },
                 "ResourceId": {"Ref": "GardenerResource"},
                 "RestApiId": {"Ref": "GardenerApi"},
                 "MethodResponses": [{
-                    "StatusCode": 200
+                    "StatusCode": 200,
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": false
+                    }
                 }]
             }
         },
 
-        "ApiKey": {
-            "Type": "AWS::ApiGateway::ApiKey",
+        "OptionsRequest": {
+            "Type": "AWS::ApiGateway::Method",
             "Properties": {
-                "Description": "API Key for the Gardener API",
-                "Name": "Gardener API",
-                "Enabled": true,
-                "StageKeys": [
-                    {
-                        "RestApiId": {"Ref": "GardenerApi"},
-                        "StageName": {"Ref": "GardenerApiStage"}
+                "AuthorizationType": "NONE",
+                "RestApiId": {"Ref": "GardenerApi"},
+                "ResourceId": {"Ref": "GardenerResource"},
+                "HttpMethod": "OPTIONS",
+                "Integration": {
+                    "IntegrationResponses": [
+                        {
+                            "StatusCode": 200,
+                            "ResponseParameters": {
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-cognito-auth'",
+                                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'",
+                                "method.response.header.Access-Control-Allow-Origin": "'*'"
+                            },
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            }
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH",
+                    "RequestTemplates": {
+                        "application/json": "{'statusCode': 200}"
+                    },
+                    "Type": "MOCK"
+                },
+                "MethodResponses": [{
+                    "StatusCode": 200,
+                    "ResponseModels": {
+                        "application/json": "Empty"
+                    },
+                    "ResponseParameters": {
+                        "method.response.header.Access-Control-Allow-Headers": false,
+                        "method.response.header.Access-Control-Allow-Methods": false,
+                        "method.response.header.Access-Control-Allow-Origin": false
                     }
-                ]
+                }]
             }
         },
 
-        "UsagePlan": {
-            "Type": "AWS::ApiGateway::UsagePlan",
+        "GardenerAuthorizer": {
+            "Type": "AWS::ApiGateway::Authorizer",
             "Properties": {
-                "ApiStages": [
-                    { "ApiId": { "Ref": "GardenerApi" }, "Stage": { "Ref": "GardenerApiStage"} }
-                ]
-            }
-        },
-
-        "UsagePlanKey": {
-            "Type": "AWS::ApiGateway::UsagePlanKey",
-            "Properties": {
-                "KeyId": {"Ref": "ApiKey"},
-                "KeyType": "API_KEY",
-                "UsagePlanId": {"Ref": "UsagePlan"}
+                "Type": "COGNITO_USER_POOLS",
+                "ProviderARNs": [{"Ref": "CognitoUserPool"}],
+                "IdentitySource": "method.request.header.x-cognito-auth",
+                "Name": "CognitoAuth",
+                "RestApiId": {"Ref": "GardenerApi"}
             }
         }
     },
     "Outputs": {
-
+        "ApiUrl": {
+            "Value": {
+                "Fn::Join": [
+                    "/", [
+                        {
+                            "Fn::Join": [
+                                ".", [
+                                    {"Fn::Join": ["", ["https://", {"Ref": "GardenerApi"}]]},
+                                    "execute-api",
+                                    {"Ref": "AWS::Region"},
+                                    {"Ref": "AWS::URLSuffix"}
+                                ]
+                            ]
+                        },
+                        {"Ref": "GardenerApiStage"}
+                    ]
+                ]
+            }
+        }
     }
 }

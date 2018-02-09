@@ -27,6 +27,9 @@
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.6/angular.min.js"></script>
     <script src="lib/angular-resource.min.js"></script>
 
+    <script src="lib/aws-cognito-sdk.min.js"></script>
+    <script src="lib/amazon-cognito-auth.min.js"></script>
+
     <script src="lib/aws-sdk-2.188.0.min.js"></script>
 
     <script src="aws-config.js"></script>
@@ -35,13 +38,31 @@
 
 <body ng-app="GardenerApp">
     <div ng-controller="GardenerController">
+        <nav class="navbar navbar-inverse">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                </div>
+                <ul class="nav navbar-nav">
+                </ul>
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a id="signInButton" ng-hide="isAuthenticated()" ng-click="signIn()" href="javascript:void(0)">
+                        <span class="glyphicon glyphicon-log-in"></span> Login</a>
+
+                        <a id="signOutButton" ng-show="isAuthenticated()" ng-click="signOut()" href="javascript:void(0)">
+                                <span class="glyphicon glyphicon-log-out"></span> Log out</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
         <div class="container">
             <div class="row">
                 <img src="img/45.jpg" class="img-responsive center-block" title="Monkey Garden">
             </div>
         </div>
 
-        <div class="container-fluid">
+        <div class="container-fluid" ng-show="isAuthenticated()">
             <div class="row">
                 <div class="col-md-12">
                     <div class="inline-form">

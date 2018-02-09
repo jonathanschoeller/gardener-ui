@@ -1,7 +1,50 @@
 angular.module('GardenerApp', ['ngResource'])
-    .factory('GardenerService', function($resource){
+    .service('CognitoService', function($window){
+        var CognitoAuth = AmazonCognitoIdentity.CognitoAuth;
+        var authData = {
+            ClientId : '45898j2266aq64nv9lqb0lc29e',
+            AppWebDomain : 'schoeller.auth.us-east-1.amazoncognito.com',
+            TokenScopesArray : ['email', 'profile','openid'],
+            RedirectUriSignIn : 'https://www.self.com/index.html',
+            RedirectUriSignOut : 'https://www.self.com/index.html',
+            UserPoolId : 'us-east-1_XhnjRllOF'
+        };
+
+        var auth = new AWSCognito.CognitoIdentityServiceProvider.CognitoAuth(authData);
+        auth.userhandler = {
+            onSuccess: function(result){
+                console.log(result);
+                return result;
+            },
+            onFailure: function(err){
+                console.error(err);
+                return err;
+            }
+        };
+
+        var curUrl = $window.location.href;
+        auth.parseCognitoWebResponse(curUrl);
+
+        this.signIn = function() {
+            auth.getSession();
+        }
+
+        this.signOut = function() {
+            auth.signOut();
+        }
+
+        this.isAuthenticated = function() {
+            return auth.isUserSignedIn();
+        }
+
+        this.getIdToken = function() {
+            var session = auth.isUserSignedIn() ? auth.getSession() : null;
+            return auth.getSignInUserSession().getIdToken().getJwtToken();
+        }
+    })
+    .factory('GardenerService', function($resource, CognitoService) {
         var headers = {
-            'x-api-key': awsConfig.apiKey
+            'x-cognito-auth': CognitoService.getIdToken()
         };
 
         return $resource(awsConfig.apiUrl + '/gardener', {}, {
@@ -15,19 +58,24 @@ angular.module('GardenerApp', ['ngResource'])
             }
         });
     })
-    .controller('GardenerController', function ($scope, $window, GardenerService) {
-        var topicRoot = awsConfig.topicRoot;
-
+    .controller('GardenerController', function ($scope, GardenerService, CognitoService) {
         AWS.config.update(awsConfig.global);
+
+        $scope.signIn = CognitoService.signIn;
+        $scope.signOut = CognitoService.signOut;
+        $scope.isAuthenticated = CognitoService.isAuthenticated;
+
         $scope.ms = Number(localStorage.getItem('ms') || 2000);
 
         $scope.batteryPercent = function(){
             return ($scope.battery - 2500) / 11;
         }
 
-        GardenerService.getShadow(function(shadow){
-            $scope.battery = shadow.state.reported.bat;
-        });
+        if (CognitoService.isAuthenticated()) {
+            GardenerService.getShadow(function(shadow){
+                $scope.battery = shadow.state.reported.bat;
+            });
+        }
 
         $scope.openValve = function (ms) {
             sendOpenValveCommand(ms);
