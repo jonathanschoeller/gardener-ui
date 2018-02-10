@@ -88,7 +88,7 @@ angular.module('GardenerApp', ['ngResource'])
                 GardenerService.getShadow(function(shadow){
                     var state = shadow.state,
                         reported = state.reported,
-                        desired = state.desired,
+                        desired = state.desired || {},
                         version = shadow.version;
 
                     desired['totalValveOpenMS'] = (desired.totalValveOpenMS || reported.totalValveOpenMS || 0) + ms;
