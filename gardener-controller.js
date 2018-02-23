@@ -5,8 +5,8 @@ angular.module('GardenerApp', ['ngResource'])
             ClientId : '45898j2266aq64nv9lqb0lc29e',
             AppWebDomain : 'schoeller.auth.us-east-1.amazoncognito.com',
             TokenScopesArray : ['email', 'profile','openid'],
-            RedirectUriSignIn : 'https://www.self.com/index.html',
-            RedirectUriSignOut : 'https://www.self.com/index.html',
+            RedirectUriSignIn : 'https://monkey-garden.jonathanschoeller.com',
+            RedirectUriSignOut : 'https://monkey-garden.jonathanschoeller.com',
             UserPoolId : 'us-east-1_XhnjRllOF'
         };
 
