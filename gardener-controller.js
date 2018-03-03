@@ -68,7 +68,7 @@ angular.module('GardenerApp', ['ngResource'])
         $scope.ms = Number(localStorage.getItem('ms') || 2000);
 
         $scope.batteryPercent = function(){
-            return ($scope.battery - 2500) / 11;
+            return ($scope.battery - 2200) / 11;
         }
 
         if (CognitoService.isAuthenticated()) {
